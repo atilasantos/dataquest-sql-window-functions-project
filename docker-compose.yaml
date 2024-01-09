@@ -1,0 +1,52 @@
+version: '3.8'
+
+# extension fields
+x-logging: &default-logging
+  options:
+    max-size: '12m'
+    max-file: '5'
+  driver: json-file
+x-restart-policy: &restart_policy
+  restart: unless-stopped
+x-depends_on-healthy: &depends_on-healthy
+  condition: service_healthy
+x-healthcheck-defaults: &healthcheck_defaults
+  interval: "$HEALTHCHECK_INTERVAL"
+  timeout: "$HEALTHCHECK_TIMEOUT"
+  retries: $HEALTHCHECK_RETRIES
+  start_period: 10s
+
+volumes:
+  postgres_data:
+    external: true
+
+networks:
+  database:
+    name: database
+    driver: bridge
+
+services:
+  postgres:
+    <<: *restart_policy
+    image: "$POSTGRES_IMAGE"
+    logging: *default-logging
+    container_name: postgres
+    hostname: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      <<: *healthcheck_defaults
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: northwind
+    volumes:
+      - "postgres_data:/var/lib/postgresql/data"
+      - type: bind
+        read_only: true
+        source: ./postgres/northwind.sql
+        target: /docker-entrypoint-initdb.d/northwind.sql
+    networks:
+      - database
